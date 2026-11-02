@@ -1,0 +1,140 @@
+﻿<Window x:Class="AgentApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:AgentApp.ViewModels"
+        Title="Агент — Информация о системе"
+        Width="980" Height="680"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E"
+        Foreground="#E8E8E8">
+
+    <Window.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#4FC1FF"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Margin" Value="0,18,0,10"/>
+        </Style>
+
+        <Style x:Key="FirstSectionHeader" TargetType="TextBlock" BasedOn="{StaticResource SectionHeader}">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="RowLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#9A9A9A"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="MaxWidth" Value="240"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,0,20,0"/>
+        </Style>
+
+        <Style x:Key="RowValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#E8E8E8"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style x:Key="Muted" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#9A9A9A"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="Foreground" Value="#E8E8E8"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="CaretBrush" Value="#E8E8E8"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#0E639C"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="340"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="#252526" CornerRadius="8" Padding="24">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Sections}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:InfoSection}">
+                            <StackPanel Margin="0,0,0,8">
+                                <TextBlock Text="{Binding Title}"
+                                           Style="{StaticResource SectionHeader}"/>
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:InfoRow}">
+                                            <Grid Margin="0,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Label}"
+                                                           Style="{StaticResource RowLabel}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Value}"
+                                                           Style="{StaticResource RowValue}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Column="2">
+            <TextBlock Text="Путь к JSON"
+                       Style="{StaticResource FirstSectionHeader}"/>
+            <TextBox Text="{Binding JsonPath, Mode=OneWay}"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     Margin="0,0,0,20"/>
+
+            <TextBlock Text="URL админ-панели"
+                       Style="{StaticResource SectionHeader}"/>
+            <TextBox Text="{Binding AdminUrl, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,6"/>
+            <TextBlock Text="Например: wss://192.168.1.10:9000/agent"
+                       Style="{StaticResource Muted}"
+                       FontSize="11"
+                       Margin="0,0,0,20"/>
+
+            <Button Content="Обновить данные"
+                    Command="{Binding RefreshCommand}"
+                    Margin="0,0,0,10"/>
+            <Button Content="Отправить админу"
+                    Command="{Binding SendCommand}"/>
+
+            <Border Background="#252526" CornerRadius="8" Padding="16" Margin="0,24,0,0">
+                <StackPanel>
+                    <TextBlock Text="Статус"
+                               Style="{StaticResource Muted}"
+                               FontSize="11"/>
+                    <TextBlock Text="{Binding Status}"
+                               Style="{StaticResource RowValue}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Window>
