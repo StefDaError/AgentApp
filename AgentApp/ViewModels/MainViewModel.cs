@@ -4,10 +4,15 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using AgentApp.Hardware;
 using AgentApp.Serialization;
+using AgentApp.Transport;
 
 namespace AgentApp.ViewModels;
 
@@ -16,16 +21,25 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly IHardwareInfoProvider _provider;
     private readonly HardwareJsonWriter _jsonWriter;
 
+    private static readonly JsonSerializerOptions SendOptions = new()
+    {
+        WriteIndented = false,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     public MainViewModel()
     {
         _provider = new WindowsHardwareInfoProvider();
         _jsonWriter = new HardwareJsonWriter();
 
         RefreshCommand = new RelayCommand(_ => Refresh());
-        SendCommand = new RelayCommand(_ => Send(), _ => !string.IsNullOrWhiteSpace(AdminUrl));
+        SendCommand = new AsyncRelayCommand(_ => SendAsync(),
+            _ => !IsBusy && !string.IsNullOrWhiteSpace(AdminUrl));
 
         Refresh();
     }
+
+    public string AgentId { get; } = Environment.MachineName;
 
     public ObservableCollection<InfoSection> Sections { get; } = new();
 
@@ -50,6 +64,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set { _status = value; OnPropertyChanged(); }
     }
 
+    private bool _isBusy;
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set { _isBusy = value; OnPropertyChanged(); }
+    }
+
     public ICommand RefreshCommand { get; }
     public ICommand SendCommand { get; }
 
@@ -69,23 +90,62 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private void Send()
+    private async Task SendAsync()
     {
         if (!Uri.TryCreate(AdminUrl, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != "http" && uri.Scheme != "https" &&
-             uri.Scheme != "ws" && uri.Scheme != "wss"))
+            (uri.Scheme != "ws" && uri.Scheme != "wss"))
         {
-            MessageBox.Show("URL должен быть вида http(s)://... или ws(s)://...",
+            MessageBox.Show("URL должен быть вида ws://... или wss://...",
                             "Некорректный URL",
                             MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        Status = $"URL принят: {uri}. Отправка появится после реализации транспорта.";
+        try
+        {
+            IsBusy = true;
+            Status = $"Отправка на {uri.Host}:{uri.Port}...";
+
+            // Пересобираем свежие данные и обновляем файл
+            var info = _provider.Collect();
+            Sections.Clear();
+            BuildSections(info);
+            JsonPath = _jsonWriter.Write(info);
+
+            // Оборачиваем в конверт
+            var envelope = MessageEnvelope.CreateHardware(AgentId, info);
+            var json = JsonSerializer.Serialize(envelope, SendOptions);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await using var transport = new WebSocketClientTransport();
+
+            await transport.ConnectAsync(uri, cts.Token);
+            await transport.SendAsync(json, cts.Token);
+            await transport.CloseAsync(cts.Token);
+
+            Status = $"Отправлено на {uri.Host}:{uri.Port} ({json.Length} байт)";
+        }
+        catch (TimeoutException ex)
+        {
+            Status = $"Таймаут: {ex.Message}";
+        }
+        catch (System.Net.WebSockets.WebSocketException ex)
+        {
+            Status = $"Ошибка WebSocket: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Ошибка отправки: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void BuildSections(HardwareInfo info)
     {
+        // ... без изменений, оставь как было
         Sections.Add(new InfoSection("CPU", new[]
         {
             new InfoRow("Модель", info.Cpu.Name),
